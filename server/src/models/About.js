@@ -38,16 +38,15 @@ const aboutSchema = new mongoose.Schema({
     trim: true,
     match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
   },
- profileImage: {
+profileImage: {
     type: String,
     trim: true,
-    maxlength: [200, 'Profile image URL too long'],  // ← YEH LINE DELETE KAREIN
   },
   resume: {
     type: String,
     trim: true,
-    maxlength: [500, 'Resume URL too long'],  // ← YEH LINE BHAI DELETE KAREIN
   },
+
 
   stats: [{
     value: {
