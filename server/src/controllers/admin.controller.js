@@ -77,11 +77,9 @@ export const uploadAboutProfileImage = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'An image is required' });
   }
 
-  await fs.mkdir(uploadsDirectory, { recursive: true });
-  const extension = path.extname(req.file.originalname).toLowerCase() || '.jpeg';
-  const filename = `profile-${randomUUID()}${extension}`;
-  await fs.writeFile(path.join(uploadsDirectory, filename), req.file.buffer);
-  const imageUrl = `/uploads/${filename}`;
+  const mimeType = req.file.mimetype || 'image/jpeg';
+  const base64Data = req.file.buffer.toString('base64');
+  const imageUrl = `data:${mimeType};base64,${base64Data}`;
 
   let about = await About.findOne().sort({ createdAt: -1 });
   if (about) {
@@ -104,11 +102,9 @@ export const uploadAboutResume = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'A resume file is required' });
   }
 
-  await fs.mkdir(uploadsDirectory, { recursive: true });
-  const extension = path.extname(req.file.originalname).toLowerCase() || '.pdf';
-  const filename = `resume-${randomUUID()}${extension}`;
-  await fs.writeFile(path.join(uploadsDirectory, filename), req.file.buffer);
-  const resumeUrl = `/uploads/${filename}`;
+  const mimeType = req.file.mimetype || 'application/pdf';
+  const base64Data = req.file.buffer.toString('base64');
+  const resumeUrl = `data:${mimeType};base64,${base64Data}`;
 
   let about = await About.findOne().sort({ createdAt: -1 });
   if (about) {
