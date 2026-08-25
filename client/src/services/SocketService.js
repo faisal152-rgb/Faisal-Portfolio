@@ -19,7 +19,7 @@ class SocketService {
       import('socket.io-client').then(({ io }) => {
         const socketUrl = import.meta.env.VITE_SOCKET_URL || (
           import.meta.env.PROD
-            ? 'https://faisal-portfolio-csv3.onrender.com'
+            ? 'https://faisal-portfolio-ewl9.onrender.com'
             : `${window.location.protocol}//${window.location.hostname}:5000`
         );
 
