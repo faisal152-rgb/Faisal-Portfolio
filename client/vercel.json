@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://faisal-portfolio-8yi4.onrender.com/api/:path*"
+      "destination": "https://faisal-portfolio-ewl9.onrender.com/api/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://faisal-portfolio-8yi4.onrender.com/uploads/:path*"
+      "destination": "https://faisal-portfolio-ewl9.onrender.com/uploads/:path*"
     },
     {
       "source": "/:path*",
