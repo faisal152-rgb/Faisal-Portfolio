@@ -203,7 +203,7 @@ app.use((req, res, next) => {
 
   res.on('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
-    console.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs.toFixed(0)}ms`);
+    console.log(`${req.method} ${req.originalUrl} ${res.statusCode}   ${durationMs.toFixed(0)}ms`);
   });
 
   next();
