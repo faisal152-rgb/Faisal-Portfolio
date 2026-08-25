@@ -1,0 +1,596 @@
+/* Hero.css */
+
+/* --------------------------------------------------
+   Base hero background — radial pink glow on top of
+   a layered linear gradient (deep indigo → fuchsia).
+-------------------------------------------------- */
+.gradient-hero {
+  position: relative;
+  width: 100%;
+  min-height: 600px;
+  overflow: hidden;
+  border-radius: 10px;
+  isolation: isolate;
+  color: #ffffff;
+  background:
+    radial-gradient(
+      ellipse 420px 300px at 76% 28%,
+      rgba(255, 42, 213, 0.28) 0%,
+      rgba(214, 35, 207, 0.12) 42%,
+      transparent 75%
+    ),
+    linear-gradient(
+      112deg,
+      #261070 0%,
+      #3a0d91 32%,
+      #6809ad 53%,
+      #a50fba 75%,
+      #c52cb8 100%
+    );
+}
+
+/* --------------------------------------------------
+   Diagonal bands
+-------------------------------------------------- */
+.hero-band {
+  position: absolute;
+  top: -80px;
+  height: 760px;
+  transform: skewX(-22deg);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hero-band-1 {
+  left: 50%;
+  width: 74px;
+  background: rgba(40, 8, 118, 0.30);
+  filter: blur(0.2px);
+}
+
+.hero-band-2 {
+  left: 57%;
+  width: 95px;
+  background: rgba(245, 33, 214, 0.13);
+  filter: blur(0.3px);
+}
+
+/* --------------------------------------------------
+   Vertical pink glow (right side)
+-------------------------------------------------- */
+.hero-glow {
+  position: absolute;
+  top: -80px;
+  right: 24%;
+  width: 280px;
+  height: 420px;
+  background: radial-gradient(
+    ellipse,
+    rgba(255, 38, 220, 0.22) 0%,
+    rgba(255, 38, 220, 0.08) 38%,
+    transparent 72%
+  );
+  filter: blur(35px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* --------------------------------------------------
+   Light sheen diagonal overlay (subtle highlight)
+-------------------------------------------------- */
+.gradient-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 22%,
+    rgba(255, 255, 255, 0.10) 28%,
+    rgba(255, 255, 255, 0.18) 34%,
+    rgba(255, 255, 255, 0.10) 40%,
+    transparent 46%,
+    transparent 58%,
+    rgba(255, 255, 255, 0.08) 64%,
+    rgba(255, 255, 255, 0.14) 70%,
+    rgba(255, 255, 255, 0.08) 76%,
+    transparent 82%,
+    transparent 100%
+  );
+}
+
+/* Make sure interactive content sits above decorative layers */
+.gradient-hero > .z-content {
+  position: relative;
+  z-index: 10;
+}
+
+/* --------------------------------------------------
+   "Available for New Projects" status card
+-------------------------------------------------- */
+.hero-available-card {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-width: 22rem;
+  padding: 1rem 1.15rem;
+  border-radius: 1.25rem;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 18px 40px -18px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
+  animation: hero-available-in 520ms ease both;
+}
+
+@keyframes hero-available-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-available-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  align-self: flex-start;
+  padding: 0.3rem 0.7rem 0.3rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+.hero-available-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #d1fae5;
+  text-transform: uppercase;
+}
+
+.hero-available-pulse {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+.hero-available-dot {
+  position: relative;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  display: block;
+}
+
+.hero-available-dot-online {
+  background: #34d399;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.9);
+}
+
+.hero-available-dot-offline {
+  background: #f87171;
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.9);
+}
+
+.hero-available-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.55;
+  animation: hero-pulse 1.6s ease-out infinite;
+}
+
+.hero-available-dot-online::after {
+  background: #34d399;
+}
+
+.hero-available-dot-offline::after {
+  background: #f87171;
+}
+
+@keyframes hero-pulse {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.hero-available-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.hero-available-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.hero-available-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(233, 213, 255, 0.85);
+}
+
+.hero-available-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.hero-available-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #6d28d9;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.4);
+}
+
+.hero-available-cta:hover {
+  transform: translateY(-1px);
+  background: #f5f3ff;
+  box-shadow: 0 12px 22px -10px rgba(109, 40, 217, 0.55);
+}
+
+.hero-available-cta:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.hero-available-meta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(233, 213, 255, 0.7);
+}
+
+@media (max-width: 480px) {
+  .hero-available-card {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* --------------------------------------------------
+   Phone mockup — "Available for" status card
+-------------------------------------------------- */
+.phone-available-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(
+    180deg,
+    rgba(16, 185, 129, 0.2) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  box-shadow:
+    0 10px 22px -12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.phone-available-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.65rem 0.25rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.22);
+  border: 1px solid rgba(52, 211, 153, 0.55);
+}
+
+.phone-available-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #d1fae5;
+}
+
+.phone-available-pulse {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.6rem;
+  height: 0.6rem;
+}
+
+.phone-available-dot {
+  position: relative;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.9);
+}
+
+.phone-available-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #34d399;
+  opacity: 0.55;
+  animation: phone-available-pulse 1.6s ease-out infinite;
+}
+
+@keyframes phone-available-pulse {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.phone-available-meta {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(209, 250, 229, 0.92);
+  letter-spacing: 0.01em;
+}
+
+.phone-available-meta-dot {
+  display: inline-block;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 9999px;
+  background: #6ee7b7;
+  box-shadow: 0 0 6px rgba(110, 231, 183, 0.8);
+}
+
+/* --------------------------------------------------
+   Responsive
+-------------------------------------------------- */
+@media (max-width: 900px) {
+  .gradient-hero {
+    min-height: 500px;
+  }
+
+  .hero-band-1 {
+    left: 48%;
+  }
+
+  .hero-band-2 {
+    left: 57%;
+  }
+}
+
+@media (max-width: 600px) {
+  .gradient-hero {
+    min-height: 420px;
+    border-radius: 8px;
+  }
+
+  .hero-band-1 {
+    left: 42%;
+    width: 55px;
+  }
+
+  .hero-band-2 {
+    left: 54%;
+    width: 70px;
+  }
+
+  .hero-glow {
+    right: 5%;
+    width: 220px;
+  }
+}
+
+/* ---------- Phone mockup ---------- */
+
+.phone-frame {
+  position: relative;
+  width: 285px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 46px;
+  padding: 10px 10px 16px;
+  box-shadow:
+    0 40px 80px -25px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Dynamic Island / notch */
+.phone-notch {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 26px;
+  background: #0a0a0a;
+  border-radius: 20px;
+  z-index: 3;
+}
+
+/* Status bar (above screen content) */
+.phone-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 22px 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 11px;
+  font-weight: 700;
+  height: 32px;
+  letter-spacing: 0.2px;
+  position: relative;
+  z-index: 2;
+}
+
+.phone-status-icons {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+/* Inner phone screen — no background card; content sits directly
+   on the phone frame so the hero gradient shows through. */
+.phone-screen {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 36px;
+  padding: 28px 18px 20px;
+  text-align: center;
+  color: white;
+  min-height: 480px;
+  height: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* Both freelance + chat views share the same transparent background. */
+.phone-screen-chat {
+  padding: 8px 6px 10px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  height: 480px;
+  max-height: 480px;
+}
+
+.phone-screen-freelance {
+  padding: 28px 18px 20px;
+  background: transparent;
+  border: none;
+  text-align: center;
+}
+
+.phone-screen-view {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.phone-screen-view-hidden {
+  display: none;
+}
+
+/* Freelance view content wrapper — fills the phone screen height */
+.phone-freelance-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  animation: phone-view-in 280ms ease both;
+}
+
+@keyframes phone-view-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+
+/* Chat icon inside the AI Assistant trigger */
+.phone-ai-chat-icon {
+  color: #ff63e9;
+  filter: drop-shadow(0 0 6px rgba(255, 99, 233, 0.55));
+  transition: transform 200ms ease, color 200ms ease;
+}
+
+.phone-ai-trigger:hover .phone-ai-chat-icon {
+  color: #ff9cf1;
+  transform: translateY(-2px);
+}
+
+/* Fuchsia accent underline */
+.phone-accent-bar {
+  background: linear-gradient(
+    90deg,
+    #d946ef 0%,
+    #c084fc 100%
+  );
+  box-shadow: 0 0 12px rgba(217, 70, 239, 0.6);
+}
+
+/* Bouncing scroll arrow */
+@keyframes phoneScrollBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.85; }
+  50%      { transform: translateY(4px); opacity: 1; }
+}
+.phone-scroll-arrow {
+  animation: phoneScrollBounce 1.4s ease-in-out infinite;
+}
+
+/* Upwork card icon tile */
+.upwork-tile {
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+  color: #14a800;
+}
+
+/* Fiverr card icon tile */
+.fiverr-tile {
+  background: linear-gradient(180deg, #1dbf73 0%, #19a463 100%);
+  color: white;
+}
+
+/* Responsive scaling */
+@media (min-width: 768px) {
+  .phone-frame {
+    width: 310px;
+  }
+  .phone-screen {
+    min-height: 500px;
+    padding: 32px 20px 22px;
+  }
+  .phone-screen-chat {
+    min-height: 540px;
+    padding: 12px 12px 14px;
+  }
+}
+
+/* Larger chat on big screens */
+@media (min-width: 1024px) {
+  .phone-frame {
+    width: 330px;
+  }
+  .phone-screen-chat {
+    min-height: 580px;
+  }
+}

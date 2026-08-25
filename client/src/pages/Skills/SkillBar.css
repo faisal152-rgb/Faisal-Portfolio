@@ -1,0 +1,4 @@
+/* SkillBar.css */
+.skill-bar-fill {
+  transition: width 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}

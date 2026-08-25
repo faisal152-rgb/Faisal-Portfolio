@@ -1,0 +1,31 @@
+/* Footer.css */
+.site-footer-bg {
+  background-color: #201c1e;
+}
+
+.footer-link {
+  transition: color 200ms ease;
+}
+.footer-link:hover {
+  color: var(--color-brand-400);
+}
+
+.footer-status-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 9999px;
+  border: 2px solid #201c1e;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
+}
+
+.footer-status-dot-online {
+  background: #34d399;
+}
+
+.footer-status-dot-offline {
+  background: #f87171;
+}
+

@@ -1,0 +1,32 @@
+/* Navbar.css */
+.site-header-bg {
+  background-color: #ffffff;
+}
+
+.navbar-blur {
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  background-color: rgba(38, 16, 112, 0.28);
+  border: 1px solid rgba(34, 27, 27, 0.1);
+}
+
+.navbar-status-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.navbar-status-dot-online {
+  background: #34d399;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.9), 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.navbar-status-dot-offline {
+  background: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.9), 0 0 0 3px rgba(239, 68, 68, 0.12);
+}

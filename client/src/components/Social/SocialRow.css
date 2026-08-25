@@ -1,0 +1,90 @@
+/* SocialRow.css */
+.social-icon {
+  transition: transform 200ms ease, background-color 200ms ease,
+    border-color 200ms ease, color 200ms ease;
+}
+.social-icon:hover {
+  transform: translateY(-1px);
+}
+
+.social-default {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.social-github {
+  border-color: #24292f;
+  color: #24292f;
+}
+
+.social-github:hover {
+  background-color: #24292f;
+  border-color: #24292f;
+  color: #ffffff;
+}
+
+.social-linkedin {
+  border-color: #0a66c2;
+  color: #0a66c2;
+}
+
+.social-linkedin:hover {
+  background-color: #0a66c2;
+  border-color: #0a66c2;
+  color: #ffffff;
+}
+
+.social-instagram {
+  border-color: #e1306c;
+  color: #e1306c;
+}
+
+.social-instagram:hover {
+  background-color: #e1306c;
+  border-color: #e1306c;
+  color: #ffffff;
+}
+
+.social-twitter {
+  border-color: #1da1f2;
+  color: #1da1f2;
+}
+
+.social-twitter:hover {
+  background-color: #1da1f2;
+  border-color: #1da1f2;
+  color: #ffffff;
+}
+
+.social-email {
+  border-color: #ea4335;
+  color: #ea4335;
+}
+
+.social-email:hover {
+  background-color: #ea4335;
+  border-color: #ea4335;
+  color: #ffffff;
+}
+
+.social-tiktok {
+  border-color: #111111;
+  color: #111111;
+}
+
+.social-tiktok:hover {
+  background-color: #111111;
+  border-color: #111111;
+  color: #ffffff;
+}
+
+.social-whatsapp {
+  border-color: #25d366;
+  color: #25d366;
+}
+
+.social-whatsapp:hover {
+  background-color: #25d366;
+  border-color: #25d366;
+  color: #ffffff;
+}

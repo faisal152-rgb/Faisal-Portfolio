@@ -1,0 +1,252 @@
+/* ===========================================================
+   Skills Section — Light Theme (Services-style header)
+   =========================================================== */
+
+.skills-section {
+  background: #ffffff;
+  padding: 5rem 1.25rem 6rem;
+  color: #0f172a;
+  font-family: inherit;
+  position: relative;
+  overflow: hidden;
+}
+
+/* subtle radial glow behind the section */
+.skills-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(168, 85, 247, 0.08), transparent 70%),
+    radial-gradient(50% 40% at 100% 80%, rgba(236, 72, 153, 0.06), transparent 70%);
+  pointer-events: none;
+}
+
+.skills-container {
+  max-width: 72rem;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Header ---------- */
+.skills-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.skills-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.skills-title-line {
+  display: inline-block;
+  width: 3rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #a855f7, transparent);
+  border-radius: 2px;
+}
+
+.skills-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, #6d28d9 0%, #0f172a 50%, #6d28d9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0;
+}
+
+.skills-subtitle {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* ---------- Skill Groups ---------- */
+.skills-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+  .skills-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.skill-group-card {
+  background: linear-gradient(180deg, #ffffff 0%, #faf7ff 100%);
+  border: 1px solid #ede9fe;
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 14px -8px rgba(168, 85, 247, 0.18);
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms ease,
+    border-color 300ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.skill-group-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 80% at 0% 0%,
+    rgba(168, 85, 247, 0.08),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+.skill-group-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 10px 30px -10px rgba(168, 85, 247, 0.35);
+}
+.skill-group-card:hover::before {
+  opacity: 1;
+}
+
+.skill-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.skill-group-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6d28d9;
+  margin: 0;
+}
+
+.skill-group-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.35rem;
+  border: 1px solid #c4b5fd;
+  border-radius: 0.6rem;
+  background: #f5f3ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6d28d9;
+}
+
+.skill-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* ---------- Tech Stack ---------- */
+.tech-stack {
+  margin-top: 4rem;
+}
+
+.tech-stack-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.tech-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6d28d9;
+}
+
+.tech-legend-dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 9999px;
+}
+
+.tech-legend-dot-primary {
+  background: #a855f7;
+}
+
+.tech-legend-dot-secondary {
+  background: #ffffff;
+  border: 1px solid #c4b5fd;
+}
+
+.tech-legend-label + .tech-legend-dot {
+  margin-left: 1rem;
+}
+
+.tech-stack-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+@media (min-width: 640px) {
+  .tech-stack-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tech-stack-col-label {
+  margin-bottom: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.tech-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tech-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.tech-pill:hover {
+  transform: translateY(-1px);
+  
+}
+
+.tech-pill-primary {
+  background-image: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+  background-color: #6d28d9 !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px -8px rgba(124, 58, 237, 0.55);
+}
+
+.tech-pill-secondary {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  color: #6d28d9 !important;
+  border: 1px solid #ddd6fe;
+}
