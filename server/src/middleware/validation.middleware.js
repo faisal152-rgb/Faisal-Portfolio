@@ -132,8 +132,11 @@ export const aboutValidator = [
   body('profileImage')
     .optional({ checkFalsy: true })
     .isString()
-    .isLength({ max: 500 })
-    .withMessage('Profile image URL is too long'),
+    .withMessage('Profile image must be a string'),
+  body('resume')
+    .optional({ checkFalsy: true })
+    .isString()
+    .withMessage('Resume must be a string'),
   body('stats')
     .optional()
     .isArray()
