@@ -41,7 +41,7 @@ class DataService {
 
     const assetOrigin = import.meta.env.VITE_API_ORIGIN || (
       import.meta.env.PROD
-        ? 'https://faisal-portfolio-csv3.onrender.com'
+        ? 'https://faisal-portfolio-ewl9.onrender.com'
         : window.location.origin
     );
 
