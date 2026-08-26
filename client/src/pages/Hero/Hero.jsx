@@ -12,9 +12,45 @@ import PhoneAIChat from "../../pages/Phone AI Chat/PhoneAIChat";
 import { useSystemStatus } from "../../context/SystemStatusContext";
 import "./Hero.css";
 
+const PLATFORM_STYLES = {
+  upwork: {
+    wrapper: "flex items-center gap-3 rounded-2xl bg-emerald-500 px-4 py-3 text-white hover:bg-emerald-600 hover:-translate-y-0.5 transition shadow-lg shadow-emerald-900/30",
+    tile: "upwork-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm",
+    tileText: "up",
+    subText: "text-[10px] opacity-90",
+  },
+  fiverr: {
+    wrapper: "flex items-center gap-3 rounded-2xl bg-white px-4 py-3 text-teal-700 hover:bg-teal-50 hover:-translate-y-0.5 transition shadow-lg shadow-black/20",
+    tile: "fiverr-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm",
+    tileText: "fi",
+    subText: "text-[10px] text-slate-500",
+  },
+  default: {
+    wrapper: "flex items-center gap-3 rounded-2xl bg-purple-600 px-4 py-3 text-white hover:bg-purple-500 hover:-translate-y-0.5 transition shadow-lg shadow-purple-900/30",
+    tile: "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm bg-white/20",
+    tileText: "🔗",
+    subText: "text-[10px] opacity-90",
+  },
+};
+
+function getPlatformStyle(platformName) {
+  const key = (platformName || '').toLowerCase();
+  if (key.includes('upwork')) return PLATFORM_STYLES.upwork;
+  if (key.includes('fiverr')) return PLATFORM_STYLES.fiverr;
+  return PLATFORM_STYLES.default;
+}
+
 function PhoneFreelanceView(props) {
   var onOpenAI = props.onOpenAI;
-  const { socialLinks } = props;
+  const { socialLinks, freelance } = props;
+
+  const freelanceLinks = (freelance && freelance.length > 0)
+    ? freelance
+    : [
+        { platform: 'Upwork', url: 'https://upwork.com/freelancers/', label: 'Upwork Profile' },
+        { platform: 'Fiverr', url: 'https://fiverr.com/', label: 'Fiverr Gig' },
+      ];
+
   return (
     <div className="phone-freelance-view">
       <div className="phone-available-card" role="status" aria-live="polite">
@@ -38,37 +74,33 @@ function PhoneFreelanceView(props) {
      </p>
 
       <div className="mt-6 w-full flex flex-col gap-3">
-        <a
-          href="https://upwork.com/freelancers/~faisal"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 rounded-2xl bg-emerald-500 px-4 py-3 text-white hover:bg-emerald-600 hover:-translate-y-0.5 transition shadow-lg shadow-emerald-900/30"
-        >
-          <span className="upwork-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm">
-            up
-         </span>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-bold">Upwork Profile</p>
-            <p className="text-[10px] opacity-90">View my Upwork profile</p>
-          </div>
-          <ArrowSquareOut size={16} weight="bold" />
-       </a>
-
-        <a
-          href="https://fiverr.com/faisal"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 text-teal-700 hover:bg-teal-50 hover:-translate-y-0.5 transition shadow-lg shadow-black/20"
-        >
-          <span className="fiverr-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm">
-            fi
-         </span>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-bold">Fiverr Gig</p>
-            <p className="text-[10px] text-slate-500">Check out my Fiverr gigs</p>
-          </div>
-          <ArrowSquareOut size={16} weight="bold" />
-       </a>
+        {freelanceLinks.map((link, idx) => {
+          const style = getPlatformStyle(link.platform);
+          return (
+            <a
+              key={idx}
+              href={link.url || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={style.wrapper}
+            >
+              <span className={style.tile}>
+                {style.tileText}
+              </span>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-bold">{link.label || link.platform}</p>
+                <p className={style.subText}>
+                  {link.platform.toLowerCase().includes('upwork')
+                    ? 'View my Upwork profile'
+                    : link.platform.toLowerCase().includes('fiverr')
+                    ? 'Check out my Fiverr gigs'
+                    : `Visit ${link.platform}`}
+                </p>
+              </div>
+              <ArrowSquareOut size={16} weight="bold" />
+            </a>
+          );
+        })}
      </div>
 
       <div className="mt-auto pt-6 flex flex-col items-center gap-2">
@@ -328,7 +360,7 @@ export default function Hero({ onNavigate }) {
                 {view === "ai" ? (
                                   <PhoneAIChat onBack={backToFreelance} />
                                 ) : (
-                                  <PhoneFreelanceView onOpenAI={openAI} socialLinks={heroData.socialLinks} />
+                                  <PhoneFreelanceView onOpenAI={openAI} socialLinks={heroData.socialLinks} freelance={heroData.freelance} />
                                 )}
              </div>
            </div>
