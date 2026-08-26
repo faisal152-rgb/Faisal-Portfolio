@@ -1080,6 +1080,7 @@ async function callOpenAIApi(model, messages, apiKey = '') {
     throw new Error('OpenAI API key not configured');
   }
   
+  const storedModelId = normalizeNVIDIAModelId(model.provider, model.modelId);
   const endpoint = model.endpoint || 'https://api.openai.com/v1/chat/completions';
   
   const response = await fetch(endpoint, {
@@ -1089,7 +1090,7 @@ async function callOpenAIApi(model, messages, apiKey = '') {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: model.modelId,
+      model: storedModelId,
       messages: messages,
       temperature: model.temperature || 0.7,
       max_tokens: model.maxTokens || 4096,
@@ -1098,7 +1099,7 @@ async function callOpenAIApi(model, messages, apiKey = '') {
   });
   
   if (!response.ok) {
-    const errorData = await response.json();
+    // Attach raw body so a bad/invalid modelId shows up in logs
     throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
   
@@ -1112,6 +1113,7 @@ async function callNVIDIAApi(model, messages, apiKey = '') {
     throw new Error('NVIDIA API key not configured');
   }
   
+  const storedModelId = normalizeNVIDIAModelId(model.provider, model.modelId);
   const endpoint = model.endpoint || 'https://integrate.api.nvidia.com/v1/chat/completions';
   
   const response = await fetch(endpoint, {
@@ -1121,7 +1123,7 @@ async function callNVIDIAApi(model, messages, apiKey = '') {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: model.modelId,
+      model: storedModelId,
       messages: messages,
       temperature: model.temperature || 0.7,
       max_tokens: model.maxTokens || 4096,
@@ -1130,7 +1132,7 @@ async function callNVIDIAApi(model, messages, apiKey = '') {
   });
   
   if (!response.ok) {
-    const errorData = await response.json();
+    // Attach raw body so a bad/invalid modelId shows up in logs
     throw new Error(`NVIDIA API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
   
