@@ -68,7 +68,7 @@ const isAllowedOrigin = (origin) => {
 };
 
 const app = express();
-const uploadsDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
+const uploadsDirectory = path.resolve(process.cwd(), 'uploads');
 fs.mkdirSync(uploadsDirectory, { recursive: true });
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
