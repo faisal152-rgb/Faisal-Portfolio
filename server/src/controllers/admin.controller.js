@@ -301,7 +301,7 @@ export const uploadProjectDocument = asyncHandler(async (req, res) => {
   }
 
   await fs.mkdir(uploadsDirectory, { recursive: true });
-  const extension = path.extname(req.file.originalname).toLowerCase();
+  const extension = '.png';
   const filename = `${randomUUID()}${extension}`;
   await fs.writeFile(path.join(uploadsDirectory, filename), req.file.buffer);
 
