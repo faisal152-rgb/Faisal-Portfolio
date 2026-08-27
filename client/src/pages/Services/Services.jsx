@@ -13,35 +13,7 @@ import {
   CaretRight,
 } from "@phosphor-icons/react";
 import { dataService } from "../../services/DataService";
-
-/*
-  FIXED IMAGE PATH HANDLING - Images stored in server/uploads/ need proper URL prefix
-  When referencing uploaded images in frontend, prepend '/uploads/' to ensure correct path resolution
-*/
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return undefined;
-  // If already an absolute URL with protocol, return as-is
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
-  // If path starts with '/uploads/', return as-is (already correct format)
-  if (imagePath.startsWith("/uploads/")) return imagePath;
-  // Otherwise prepend '/uploads/' for server static file serving
-  return `/uploads/${imagePath}`;
-};
-
-// Map icon name strings to actual phosphor icon components
-const iconMap = {
-  Code,
-  Stack,
-  CloudArrowUp,
-  Cpu,
-  DeviceMobile,
-  Database,
-  Drop,
-  Sparkle,
-  ShoppingBag,
-  CaretLeft,
-  CaretRight,
-};
+import "./Services.css";
 
 const DEFAULT_PROJECT_PLACEHOLDERS = new Set([
   "new project",
@@ -67,6 +39,19 @@ const isLiveProject = (project) => {
 };
 
 const isPersistedImage = (url) => typeof url === "string" && !url.startsWith("blob:");
+
+// Map icon name strings to actual phosphor icon components
+const iconMap = {
+  Code,
+  Stack,
+  CloudArrowUp,
+  Cpu,
+  DeviceMobile,
+  Database,
+  Drop,
+  Sparkle,
+  ShoppingBag,
+};
 
 export default function Services() {
   const [idx, setIdx] = useState(0);
@@ -223,7 +208,7 @@ export default function Services() {
                       <span>Project</span>
                     </h3>
                   </div>
-                  
+
                   <div
                     className="featured-glow-line"
                     aria-hidden="true"
@@ -232,14 +217,14 @@ export default function Services() {
                       boxShadow: `0 0 16px 2px ${project.brandColor}aa, 0 0 32px 4px ${project.brandColor}55`,
                     } : undefined}
                   />
-                  
+
                   <div className="featured-body-col">
                     {/* Fixed Project Name Section */}
                     <h4 className="featured-name">{project.name}</h4>
                     
                     {/* Fixed Tagline Section */}
                     <p className="featured-tagline">{project.tagline}</p>
-                    
+
                     {/* Scrollable Tech Pills Section */}
                     <div className="featured-tech-scroll-area">
                       <div className="tech-pills">
@@ -250,7 +235,7 @@ export default function Services() {
                         })}
                       </div>
                     </div>
-                    
+
                     {/* Fixed Action Buttons Section */}
                     <div className="featured-actions">
                       {project.liveUrl && (
@@ -264,7 +249,7 @@ export default function Services() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Right laptop mockup */}
               <div className="featured-mockup" aria-hidden="true">
                 <div className="laptop">
@@ -274,7 +259,7 @@ export default function Services() {
                     <div className="laptop-screen">
                       {isPersistedImage(project.coverImage) && (
                         <img
-                          src={getImageUrl(project.coverImage)}
+                          src={project.coverImage}
                           alt={project.name}
                           style={{
                             objectFit: project.coverImageSettings?.fit || 'cover',
@@ -291,14 +276,14 @@ export default function Services() {
               </div>
             </div>
           )}
-          
+
           {liveProjects.length === 0 && (
             <div className="featured-project-empty">
               <h3 className="featured-label">Featured Project</h3>
               <p>Add a complete project from the admin panel to display it here.</p>
             </div>
           )}
-          
+
           {/* Side arrows */}
           {liveProjects.length > 1 && (
             <>
@@ -320,7 +305,7 @@ export default function Services() {
               </button>
             </>
           )}
-          
+
           {/* Dot indicators */}
           {liveProjects.length > 0 && (
             <div className="carousel-dots" role="tablist" aria-label="Projects">
