@@ -11,7 +11,7 @@ import Project from '../models/Project.js';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { io } from '../index.js';
 
-const uploadsDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads');
+const uploadsDirectory = path.resolve(process.cwd(), '../uploads');
 
 // Helper to emit socket events
 const emitUpdate = (type, data) => {
