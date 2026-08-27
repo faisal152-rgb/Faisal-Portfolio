@@ -13,7 +13,35 @@ import {
   CaretRight,
 } from "@phosphor-icons/react";
 import { dataService } from "../../services/DataService";
-import "./Services.css";
+
+/*
+  FIXED IMAGE PATH HANDLING - Images stored in server/uploads/ need proper URL prefix
+  When referencing uploaded images in frontend, prepend '/uploads/' to ensure correct path resolution
+*/
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return undefined;
+  // If already an absolute URL with protocol, return as-is
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
+  // If path starts with '/uploads/', return as-is (already correct format)
+  if (imagePath.startsWith("/uploads/")) return imagePath;
+  // Otherwise prepend '/uploads/' for server static file serving
+  return `/uploads/${imagePath}`;
+};
+
+// Map icon name strings to actual phosphor icon components
+const iconMap = {
+  Code,
+  Stack,
+  CloudArrowUp,
+  Cpu,
+  DeviceMobile,
+  Database,
+  Drop,
+  Sparkle,
+  ShoppingBag,
+  CaretLeft,
+  CaretRight,
+};
 
 const DEFAULT_PROJECT_PLACEHOLDERS = new Set([
   "new project",
@@ -39,20 +67,6 @@ const isLiveProject = (project) => {
 };
 
 const isPersistedImage = (url) => typeof url === "string" && !url.startsWith("blob:");
-
-/*
-  FIXED IMAGE PATH HANDLING - Images stored in server/uploads/ need proper URL prefix
-  When referencing uploaded images in frontend, prepend '/uploads/' to ensure correct path resolution
-*/
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return undefined;
-  // If already an absolute URL with protocol, return as-is
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
-  // If path starts with '/uploads/', return as-is (already correct format)
-  if (imagePath.startsWith("/uploads/")) return imagePath;
-  // Otherwise prepend '/uploads/' for server static file serving
-  return `/uploads/${imagePath}`;
-};
 
 export default function Services() {
   const [idx, setIdx] = useState(0);
