@@ -11,6 +11,7 @@ import AssistantSession from '../models/AssistantSession.js';
 import AIVisitorUsage from '../models/AIVisitorUsage.js';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { getIO } from '../services/io.js';
+import { decryptAPIKey, encryptAPIKey, isEncryptedAPIKey } from '../utils/apiKeyCrypto.js';
 
 const googleAuthStateStore = new Map();
 const uploadsDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads');
@@ -147,6 +148,22 @@ const getOrCreateConfig = async () => {
   if (!config) {
     config = await AIConfig.create({});
   }
+
+  let migrated = false;
+  config.apiKeys?.forEach(apiKey => {
+    if (apiKey.key && !isEncryptedAPIKey(apiKey.key)) {
+      apiKey.key = encryptAPIKey(apiKey.key);
+      migrated = true;
+    }
+  });
+  config.models?.forEach(model => {
+    if (model.apiKey && !isEncryptedAPIKey(model.apiKey)) {
+      model.apiKey = encryptAPIKey(model.apiKey);
+      migrated = true;
+    }
+  });
+  if (migrated) await config.save();
+
   return config;
 };
 
@@ -242,7 +259,7 @@ export const getAISettingsPublic = asyncHandler(async (req, res) => {
 // Admin endpoint — returns full config (auth required, applied in router)
 export const getAISettings = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   // Don't send sensitive data
   const safeConfig = config.toObject();
   delete safeConfig.apiKeys;
@@ -252,19 +269,19 @@ export const getAISettings = asyncHandler(async (req, res) => {
   safeConfig.integrations.calendar.refreshToken = undefined;
   safeConfig.integrations.whatsapp.accessToken = undefined;
   safeConfig.integrations.whatsapp.verifyToken = undefined;
-
+  
   res.status(200).json({ success: true, data: safeConfig });
 });
 
 export const updateAISettings = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   // Update only allowed fields
   const allowedFields = [
     'assistantEnabled', 'chatEnabled', 'voiceEnabled', 'fileUploadEnabled',
     'autoDetectEnabled', 'emotionEnabled', 'defaultMode', 'language', 'emotionDetect', 'workingHours'
   ];
-
+  
   allowedFields.forEach(field => {
     if (req.body[field] !== undefined) {
       config[field] = req.body[field];
@@ -274,10 +291,10 @@ export const updateAISettings = asyncHandler(async (req, res) => {
   if (req.body.uploadLimits) {
     config.uploadLimits = { ...config.uploadLimits.toObject(), ...req.body.uploadLimits };
   }
-
+  
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('settings', config);
   res.status(200).json({ success: true, data: config });
 });
@@ -339,11 +356,11 @@ function getActivePersona(config, requestedPersonaId = null) {
 // ============ AI CHAT ENDPOINT (Public) ============
 export const chatWithAI = asyncHandler(async (req, res) => {
   const { message, persona, model, imageData } = req.body;
-
+  
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ success: false, message: 'Message is required' });
   }
-
+  
   const config = await getOrCreateConfig();
 
   const chatQuota = await consumeVisitorQuota(req, config, 'chat');
@@ -354,11 +371,11 @@ export const chatWithAI = asyncHandler(async (req, res) => {
       quota: chatQuota,
     });
   }
-
+  
   if (!config.assistantEnabled || !config.chatEnabled) {
     return res.status(403).json({ success: false, message: 'AI Assistant is currently disabled' });
   }
-
+  
   // Get default model
   let selectedModel = config.models.find(m => m.isDefault && m.isActive);
   if (!selectedModel) {
@@ -391,35 +408,35 @@ export const chatWithAI = asyncHandler(async (req, res) => {
       });
     }
   }
-
+  
   // If no active model, return error
   if (!selectedModel) {
-    return res.status(503).json({
-      success: false,
-      message: 'No active AI model available. Please configure an AI model in the admin panel.'
+    return res.status(503).json({ 
+      success: false, 
+      message: 'No active AI model available. Please configure an AI model in the admin panel.' 
     });
   }
-
+  
   // Get API key from centralized apiKeys array (not from model)
   let modelApiKey = '';
   const apiKeysArray = Array.isArray(config.apiKeys) ? config.apiKeys : [];
-
-  const apiKeyRecord = apiKeysArray.find(ak =>
+  
+  const apiKeyRecord = apiKeysArray.find(ak => 
     ak?.provider?.toLowerCase() === selectedModel?.provider?.toLowerCase() && ak?.isActive
   );
   if (apiKeyRecord) {
-    modelApiKey = apiKeyRecord.key;
+    modelApiKey = decryptAPIKey(apiKeyRecord.key);
   }
 
   // Get persona by active working time, falling back to default/first active persona
   const selectedPersona = getActivePersona(config, persona);
-
+  
   // Build knowledge base for chat context
   const knowledge = (config.knowledgeBase || [])
     .filter(entry => entry.isActive !== false)
     .map(entry => `${entry.title}: ${entry.content}`)
     .join('\n');
-
+  
   // Create system prompt with knowledge base constraints
   const simpleChatSystemPrompt = `You are Faisal Abbas's AI Business Assistant. Answer questions using only verified information.
 
@@ -439,9 +456,9 @@ RULES:
   try {
     const userContent = imageData
       ? [
-        { type: 'text', text: message },
-        { type: 'image_url', image_url: { url: imageData } },
-      ]
+          { type: 'text', text: message },
+          { type: 'image_url', image_url: { url: imageData } },
+        ]
       : message;
     aiResponse = await callAIApi(selectedModel, selectedPersona, message, modelApiKey, config.personas || [], [
       { role: 'system', content: chatSystemPrompt },
@@ -449,19 +466,19 @@ RULES:
     ]);
   } catch (error) {
     console.error('AI API call error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'AI service temporarily unavailable. Please try again later.'
+    return res.status(500).json({ 
+      success: false, 
+      message: 'AI service temporarily unavailable. Please try again later.' 
     });
   }
-
-  res.status(200).json({
-    success: true,
-    data: {
+  
+  res.status(200).json({ 
+    success: true, 
+    data: { 
       response: sanitizeAIResponse(aiResponse),
       model: selectedModel?.name || 'Default',
       persona: selectedPersona?.name || 'Default'
-    }
+    } 
   });
 });
 
@@ -619,24 +636,24 @@ const sendGmail = async (integration, recipient, subject, body) => {
     console.log('[Gmail] No recipient email provided');
     return false;
   }
-
+  
   try {
     const raw = [`To: ${recipient}`, `Subject: ${subject}`, 'Content-Type: text/plain; charset=utf-8', '', body].join('\r\n');
     const encoded = Buffer.from(raw).toString('base64url');
     console.log(`[Gmail] Sending message to ${recipient}...`);
-
+    
     const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
       headers: { Authorization: `Bearer ${integration.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ raw: encoded }),
     });
-
+    
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[Gmail] Failed (${response.status}): ${errorText}`);
       return false;
     }
-
+    
     console.log(`[Gmail] ✓ Successfully sent to ${recipient}`);
     return true;
   } catch (error) {
@@ -662,30 +679,30 @@ const sendWhatsApp = async (integration, phone, body) => {
     console.log('[WhatsApp] No recipient phone provided');
     return false;
   }
-
+  
   try {
     const cleanPhone = phone.replace(/[^\d+]/g, '').replace(/^0+/, '+');
     const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`;
-
+    
     console.log(`[WhatsApp] Sending message to ${formattedPhone} (from: ${phone})...`);
-
+    
     const response = await fetch(`https://graph.facebook.com/v19.0/${integration.phoneNumberId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${integration.accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: formattedPhone,
-        type: 'text',
-        text: { body }
+      body: JSON.stringify({ 
+        messaging_product: 'whatsapp', 
+        to: formattedPhone, 
+        type: 'text', 
+        text: { body } 
       }),
     });
-
+    
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[WhatsApp] Failed (${response.status}): ${errorText}`);
       return false;
     }
-
+    
     console.log(`[WhatsApp] ✓ Successfully sent to ${formattedPhone}`);
     return true;
   } catch (error) {
@@ -820,7 +837,7 @@ export const runAssistantWorkflow = asyncHandler(async (req, res) => {
     status: rescheduleMeetingDoc.status,
   } : null;
 
-  const aiResponse = await callAIApi(selectedModel, persona, message, apiKeyRecord?.key || '', config.personas || [], [
+  const aiResponse = await callAIApi(selectedModel, persona, message, decryptAPIKey(apiKeyRecord?.key || ''), config.personas || [], [
     { role: 'system', content: workflowSystemPrompt(config, persona, { hasConversation: history.length > 0, explicitIdentity, lead: existingLead, meeting: existingMeeting, rescheduleMode, existingMeetingInfo }) },
     ...history,
     { role: 'user', content: message },
@@ -1044,12 +1061,12 @@ function buildPersonaSystemPrompt(persona, allPersonas = []) {
 async function callAIApi(model, persona, message, apiKey = '', allPersonas = [], contextMessages = []) {
   // Prepare system prompt from persona
   const systemPrompt = buildPersonaSystemPrompt(persona, allPersonas);
-
+  
   // Prepare messages array for chat completion
   const messages = contextMessages.length
     ? contextMessages
     : [{ role: "system", content: systemPrompt }, { role: "user", content: message }];
-
+  
   // Call appropriate AI API based on provider
   switch (model.provider.toLowerCase()) {
     case 'openai':
@@ -1076,18 +1093,17 @@ async function callAIApi(model, persona, message, apiKey = '', allPersonas = [],
 
 // ============ OPENAI API CALL ============
 async function callOpenAIApi(model, messages, apiKey = '') {
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+  if (!apiKey) {
     throw new Error('OpenAI API key not configured');
   }
-  const trimmedApiKey = apiKey.trim();
-
+  
   const endpoint = model.endpoint || 'https://api.openai.com/v1/chat/completions';
-
+  
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${trimmedApiKey}`
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: model.modelId,
@@ -1097,30 +1113,29 @@ async function callOpenAIApi(model, messages, apiKey = '') {
       stream: false
     })
   });
-
+  
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
-
+  
   const data = await response.json();
   return data.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
 }
 
 // ============ NVIDIA API CALL ============
 async function callNVIDIAApi(model, messages, apiKey = '') {
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+  if (!apiKey) {
     throw new Error('NVIDIA API key not configured');
   }
-  const trimmedApiKey = apiKey.trim();
-
+  
   const endpoint = model.endpoint || 'https://integrate.api.nvidia.com/v1/chat/completions';
-
+  
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${trimmedApiKey}`
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: model.modelId,
@@ -1130,34 +1145,33 @@ async function callNVIDIAApi(model, messages, apiKey = '') {
       stream: false
     })
   });
-
+  
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(`NVIDIA API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
-
+  
   const data = await response.json();
   return data.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
 }
 
 // ============ ANTHROPIC API CALL ============
 async function callAnthropicApi(model, messages, apiKey = '') {
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+  if (!apiKey) {
     throw new Error('Anthropic API key not configured');
   }
-  const trimmedApiKey = apiKey.trim();
-
+  
   const endpoint = model.endpoint || 'https://api.anthropic.com/v1/messages';
-
+  
   // Convert messages to Anthropic format
   const systemMessage = messages.find(m => m.role === 'system');
   const userMessages = messages.filter(m => m.role === 'user' || m.role === 'assistant');
-
+  
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': trimmedApiKey,
+      'x-api-key': apiKey,
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
@@ -1171,40 +1185,39 @@ async function callAnthropicApi(model, messages, apiKey = '') {
       }))
     })
   });
-
+  
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
-
+  
   const data = await response.json();
   return data.content[0]?.text || 'Sorry, I could not generate a response.';
 }
 
 // ============ GOOGLE API CALL ============
 async function callGoogleApi(model, messages, apiKey = '') {
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+  if (!apiKey) {
     throw new Error('Google API key not configured');
   }
-  const trimmedApiKey = apiKey.trim();
-
-  const endpoint = model.endpoint || `https://generativelanguage.googleapis.com/v1beta/models/${model.modelId}:generateContent?key=${trimmedApiKey}`;
-
+  
+  const endpoint = model.endpoint || `https://generativelanguage.googleapis.com/v1beta/models/${model.modelId}:generateContent?key=${apiKey}`;
+  
   // Convert messages to Google format
   const contents = messages.map(m => ({
     role: m.role === 'user' ? 'user' : 'model',
     parts: Array.isArray(m.content)
       ? m.content.map(part => part.type === 'image_url'
         ? {
-          inline_data: {
-            mime_type: part.image_url.url.match(/^data:([^;]+);/)?.[1] || 'image/jpeg',
-            data: part.image_url.url.split(',')[1],
-          },
-        }
+            inline_data: {
+              mime_type: part.image_url.url.match(/^data:([^;]+);/)?.[1] || 'image/jpeg',
+              data: part.image_url.url.split(',')[1],
+            },
+          }
         : { text: part.text })
       : [{ text: m.content }]
   }));
-
+  
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -1220,30 +1233,29 @@ async function callGoogleApi(model, messages, apiKey = '') {
       }
     })
   });
-
+  
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(`Google API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
-
+  
   const data = await response.json();
   return data.candidates[0]?.content?.parts[0]?.text || 'Sorry, I could not generate a response.';
 }
 
 // ============ OPENAI-COMPATIBLE API CALL ============
 async function callOpenAICompatibleApi(model, messages, apiKey = '') {
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+  if (!apiKey) {
     throw new Error('API key not configured for this provider');
   }
-  const trimmedApiKey = apiKey.trim();
-
+  
   const endpoint = model.endpoint || 'https://api.openai.com/v1/chat/completions'; // Default to OpenAI endpoint
-
+  
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${trimmedApiKey}`
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: model.modelId,
@@ -1253,12 +1265,12 @@ async function callOpenAICompatibleApi(model, messages, apiKey = '') {
       stream: false
     })
   });
-
+  
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(`API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
-
+  
   const data = await response.json();
   return data.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
 }
@@ -1266,42 +1278,42 @@ async function callOpenAICompatibleApi(model, messages, apiKey = '') {
 // ============ AI MODELS ============
 export const getAIModels = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   if (!config.models || config.models.length === 0) {
     return res.status(200).json({ success: true, data: [] });
   }
-
+  
   // Map and don't send API keys
   const models = config.models.map(m => {
     const modelObj = m.toObject ? m.toObject() : { ...m };
-
+    
     // Remove sensitive data
     delete modelObj.apiKey;
-
+    
     // Ensure provider is lowercase for consistency
     if (modelObj.provider) {
       modelObj.provider = String(modelObj.provider).toLowerCase();
     }
-
+    
     // Ensure capabilities is an array
     if (!Array.isArray(modelObj.capabilities)) {
       modelObj.capabilities = [];
     }
-
+    
     // Ensure isActive is a boolean
     if (modelObj.isActive === undefined) {
       modelObj.isActive = true;
     }
-
+    
     return modelObj;
   });
-
+  
   res.status(200).json({ success: true, data: models });
 });
 
 export const createAIModel = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   // Validate required fields
   if (!req.body.name || typeof req.body.name !== 'string') {
     return res.status(400).json({ success: false, message: 'Model name is required' });
@@ -1315,7 +1327,7 @@ export const createAIModel = asyncHandler(async (req, res) => {
   if (!Array.isArray(req.body.capabilities) || req.body.capabilities.length === 0) {
     return res.status(400).json({ success: false, message: 'At least one capability is required' });
   }
-
+  
   // Normalize data
   const modelData = {
     name: String(req.body.name).trim(),
@@ -1328,49 +1340,49 @@ export const createAIModel = asyncHandler(async (req, res) => {
     temperature: typeof req.body.temperature === 'number' ? req.body.temperature : 0.7,
     capabilities: Array.isArray(req.body.capabilities) ? req.body.capabilities : [],
   };
-
+  
   // Add API key only if provided
   if (req.body.apiKey && typeof req.body.apiKey === 'string') {
-    modelData.apiKey = String(req.body.apiKey).trim();
+    modelData.apiKey = encryptAPIKey(String(req.body.apiKey).trim());
   }
-
+  
   // If this is set as default, unset others
   if (modelData.isDefault) {
     config.models.forEach(m => { m.isDefault = false; });
   }
-
+  
   // Add the new model
   config.models.push(modelData);
   config.updatedBy = req.user.id;
-
+  
   // Save to database
   await config.save();
-
+  
   // Get the newly created model (with generated _id)
   const newModel = config.models[config.models.length - 1];
   const responseModel = newModel.toObject ? newModel.toObject() : { ...newModel };
-
+  
   // Remove API key from response for security
   delete responseModel.apiKey;
-
+  
   // Emit update via Socket.IO
   emitUpdate('models', config.models.map(m => {
     const obj = m.toObject ? m.toObject() : { ...m };
     delete obj.apiKey;
     return obj;
   }));
-
+  
   res.status(201).json({ success: true, data: responseModel });
 });
 
 export const updateAIModel = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const modelIndex = config.models.findIndex(m => m._id.toString() === req.params.id);
-
+  
   if (modelIndex === -1) {
     return res.status(404).json({ success: false, message: 'Model not found' });
   }
-
+  
   // Validate required fields
   if (req.body.name && typeof req.body.name !== 'string') {
     return res.status(400).json({ success: false, message: 'Model name must be a string' });
@@ -1384,7 +1396,7 @@ export const updateAIModel = asyncHandler(async (req, res) => {
   if (req.body.capabilities && !Array.isArray(req.body.capabilities)) {
     return res.status(400).json({ success: false, message: 'Capabilities must be an array' });
   }
-
+  
   // Update fields with normalization
   if (req.body.name) {
     config.models[modelIndex].name = String(req.body.name).trim();
@@ -1413,65 +1425,65 @@ export const updateAIModel = asyncHandler(async (req, res) => {
   if (req.body.capabilities && Array.isArray(req.body.capabilities)) {
     config.models[modelIndex].capabilities = req.body.capabilities;
   }
-
+  
   // Handle API key update - only update if provided and not empty
   if (req.body.apiKey !== undefined && req.body.apiKey !== '') {
-    config.models[modelIndex].apiKey = String(req.body.apiKey).trim();
+    config.models[modelIndex].apiKey = encryptAPIKey(String(req.body.apiKey).trim());
   }
-
+  
   // Handle default status
   if (req.body.isDefault) {
     config.models.forEach((m, i) => {
       m.isDefault = i === modelIndex;
     });
   }
-
+  
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   // Get updated model for response
   const updatedModel = config.models[modelIndex];
   const responseModel = updatedModel.toObject ? updatedModel.toObject() : { ...updatedModel };
-
+  
   // Remove API key from response for security
   delete responseModel.apiKey;
-
+  
   // Emit update via Socket.IO
   emitUpdate('models', config.models.map(m => {
     const obj = m.toObject ? m.toObject() : { ...m };
     delete obj.apiKey;
     return obj;
   }));
-
+  
   res.status(200).json({ success: true, data: responseModel });
 });
 
 export const deleteAIModel = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const modelIndex = config.models.findIndex(m => m._id.toString() === req.params.id);
-
+  
   if (modelIndex === -1) {
     return res.status(404).json({ success: false, message: 'Model not found' });
   }
-
+  
   config.models.splice(modelIndex, 1);
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('models', config.models);
   res.status(200).json({ success: true, message: 'Model deleted' });
 });
 
 export const setDefaultAIModel = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   config.models.forEach(m => {
     m.isDefault = m._id.toString() === req.params.id;
   });
-
+  
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('models', config.models);
   res.status(200).json({ success: true, message: 'Default model updated' });
 });
@@ -1484,15 +1496,15 @@ export const getAIPersonas = asyncHandler(async (req, res) => {
 
 export const createAIPersona = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   if (req.body.isDefault) {
     config.personas.forEach(p => { p.isDefault = false; });
   }
-
+  
   config.personas.push(req.body);
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('personas', config.personas);
   res.status(201).json({ success: true, data: config.personas[config.personas.length - 1] });
 });
@@ -1500,24 +1512,24 @@ export const createAIPersona = asyncHandler(async (req, res) => {
 export const updateAIPersona = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const personaIndex = config.personas.findIndex(p => p._id.toString() === req.params.id);
-
+  
   if (personaIndex === -1) {
     return res.status(404).json({ success: false, message: 'Persona not found' });
   }
-
+  
   if (req.body.isDefault) {
     config.personas.forEach(p => { p.isDefault = false; });
   }
-
+  
   Object.keys(req.body).forEach(key => {
     if (key !== '_id') {
       config.personas[personaIndex][key] = req.body[key];
     }
   });
-
+  
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('personas', config.personas);
   res.status(200).json({ success: true, data: config.personas[personaIndex] });
 });
@@ -1525,15 +1537,15 @@ export const updateAIPersona = asyncHandler(async (req, res) => {
 export const deleteAIPersona = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const personaIndex = config.personas.findIndex(p => p._id.toString() === req.params.id);
-
+  
   if (personaIndex === -1) {
     return res.status(404).json({ success: false, message: 'Persona not found' });
   }
-
+  
   config.personas.splice(personaIndex, 1);
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('personas', config.personas);
   res.status(200).json({ success: true, message: 'Persona deleted' });
 });
@@ -1541,7 +1553,7 @@ export const deleteAIPersona = asyncHandler(async (req, res) => {
 // ============ KNOWLEDGE BASE ============
 export const getKnowledgeBase = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   // Filter by category if provided
   let knowledge = config.knowledgeBase;
   if (req.query.category) {
@@ -1549,35 +1561,35 @@ export const getKnowledgeBase = asyncHandler(async (req, res) => {
   }
   if (req.query.search) {
     const search = req.query.search.toLowerCase();
-    knowledge = knowledge.filter(k =>
-      k.title.toLowerCase().includes(search) ||
+    knowledge = knowledge.filter(k => 
+      k.title.toLowerCase().includes(search) || 
       k.content.toLowerCase().includes(search)
     );
   }
-
+  
   // Don't send embeddings
   knowledge = knowledge.map(k => {
     const item = k.toObject();
     delete item.embedding;
     return item;
   });
-
+  
   res.status(200).json({ success: true, data: knowledge });
 });
 
 export const createKnowledgeEntry = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   // Sanitize sourceUrl - convert empty strings to null
   const entry = { ...req.body };
   if (entry.sourceUrl === '') {
     entry.sourceUrl = null;
   }
-
+  
   config.knowledgeBase.push(entry);
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('knowledge', config.knowledgeBase);
   res.status(201).json({ success: true, data: config.knowledgeBase[config.knowledgeBase.length - 1] });
 });
@@ -1585,27 +1597,27 @@ export const createKnowledgeEntry = asyncHandler(async (req, res) => {
 export const updateKnowledgeEntry = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const index = config.knowledgeBase.findIndex(k => k._id.toString() === req.params.id);
-
+  
   if (index === -1) {
     return res.status(404).json({ success: false, message: 'Knowledge entry not found' });
   }
-
+  
   Object.keys(req.body).forEach(key => {
     if (key !== '_id' && key !== 'embedding') {
       let value = req.body[key];
-
+      
       // Clean up sourceUrl - convert empty/whitespace to null
       if (key === 'sourceUrl') {
         value = (typeof value === 'string' ? value.trim() : '') || null;
       }
-
+      
       config.knowledgeBase[index][key] = value;
     }
   });
-
+  
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('knowledge', config.knowledgeBase);
   res.status(200).json({ success: true, data: config.knowledgeBase[index] });
 });
@@ -1613,15 +1625,15 @@ export const updateKnowledgeEntry = asyncHandler(async (req, res) => {
 export const deleteKnowledgeEntry = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const index = config.knowledgeBase.findIndex(k => k._id.toString() === req.params.id);
-
+  
   if (index === -1) {
     return res.status(404).json({ success: false, message: 'Knowledge entry not found' });
   }
-
+  
   config.knowledgeBase.splice(index, 1);
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('knowledge', config.knowledgeBase);
   res.status(200).json({ success: true, message: 'Knowledge entry deleted' });
 });
@@ -1629,37 +1641,40 @@ export const deleteKnowledgeEntry = asyncHandler(async (req, res) => {
 // ============ API KEYS ============
 export const getAPIKeys = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   // Don't send actual keys (security)
   const keys = config.apiKeys.map(k => {
     const key = k.toObject();
     delete key.key;
     return key;
   });
-
+  
   res.status(200).json({ success: true, data: keys });
 });
 
 // Get API keys WITH values (for internal use in model creation)
 export const getAPIKeysWithValues = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   // Return keys with values for authenticated users
   const keys = config.apiKeys.map(k => {
     const key = k.toObject();
-    // Keep the key value for the authenticated user
+    key.key = decryptAPIKey(key.key);
     return key;
   });
-
+  
   res.status(200).json({ success: true, data: keys });
 });
 
 export const createAPIKey = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-  config.apiKeys.push(req.body);
+  config.apiKeys.push({
+    ...req.body,
+    key: encryptAPIKey(String(req.body.key || '').trim()),
+  });
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   const safeKeys = config.apiKeys.map(k => { const o = k.toObject(); delete o.key; return o; });
   emitUpdate('api-keys', safeKeys);
   res.status(201).json({ success: true, message: 'API key created', data: safeKeys });
@@ -1668,20 +1683,22 @@ export const createAPIKey = asyncHandler(async (req, res) => {
 export const updateAPIKey = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const index = config.apiKeys.findIndex(k => k._id.toString() === req.params.id);
-
+  
   if (index === -1) {
     return res.status(404).json({ success: false, message: 'API key not found' });
   }
-
+  
   Object.keys(req.body).forEach(key => {
     if (key !== '_id') {
-      config.apiKeys[index][key] = req.body[key];
+      config.apiKeys[index][key] = key === 'key'
+        ? encryptAPIKey(String(req.body[key] || '').trim())
+        : req.body[key];
     }
   });
-
+  
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   const safeKeys = config.apiKeys.map(k => { const o = k.toObject(); delete o.key; return o; });
   emitUpdate('api-keys', safeKeys);
   res.status(200).json({ success: true, message: 'API key updated', data: safeKeys });
@@ -1690,15 +1707,15 @@ export const updateAPIKey = asyncHandler(async (req, res) => {
 export const deleteAPIKey = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   const index = config.apiKeys.findIndex(k => k._id.toString() === req.params.id);
-
+  
   if (index === -1) {
     return res.status(404).json({ success: false, message: 'API key not found' });
   }
-
+  
   config.apiKeys.splice(index, 1);
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   const safeKeys = config.apiKeys.map(k => { const o = k.toObject(); delete o.key; return o; });
   emitUpdate('api-keys', safeKeys);
   res.status(200).json({ success: true, message: 'API key deleted', data: safeKeys });
@@ -1999,7 +2016,7 @@ export const updateGmailIntegration = asyncHandler(async (req, res) => {
   config.integrations.gmail = { ...config.integrations.gmail.toObject(), ...req.body };
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('integrations', config.integrations);
   res.status(200).json({ success: true, data: config.integrations });
 });
@@ -2009,7 +2026,7 @@ export const updateCalendarIntegration = asyncHandler(async (req, res) => {
   config.integrations.calendar = { ...config.integrations.calendar.toObject(), ...req.body };
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('integrations', config.integrations);
   res.status(200).json({ success: true, data: config.integrations });
 });
@@ -2019,7 +2036,7 @@ export const updateWhatsAppIntegration = asyncHandler(async (req, res) => {
   config.integrations.whatsapp = { ...config.integrations.whatsapp.toObject(), ...req.body };
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('integrations', config.integrations);
   res.status(200).json({ success: true, data: config.integrations });
 });
@@ -2027,7 +2044,7 @@ export const updateWhatsAppIntegration = asyncHandler(async (req, res) => {
 // ============ INTEGRATION DIAGNOSTICS ============
 export const getIntegrationsDiagnostics = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-
+  
   const diagnostics = {
     gmail: {
       enabled: config.integrations.gmail.enabled,
@@ -2053,7 +2070,7 @@ export const getIntegrationsDiagnostics = asyncHandler(async (req, res) => {
       status: config.integrations.calendar.enabled && config.integrations.calendar.email && config.integrations.calendar.accessToken ? 'Ready' : 'Not configured',
     },
   };
-
+  
   res.status(200).json({ success: true, data: diagnostics });
 });
 
@@ -2068,7 +2085,7 @@ export const updateSecuritySettings = asyncHandler(async (req, res) => {
   config.security = { ...config.security.toObject(), ...req.body };
   config.updatedBy = req.user.id;
   await config.save();
-
+  
   emitUpdate('security', config.security);
   res.status(200).json({ success: true, data: config.security });
 });
