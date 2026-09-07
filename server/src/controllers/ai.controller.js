@@ -71,8 +71,16 @@ const buildLanguageInstruction = (language) => {
   return `LANGUAGE: Reply only in ${selectedLanguage}. Do not switch languages unless the client explicitly requests it.`;
 };
 
+const DEPRECATED_NVIDIA_MODELS = [
+  'thinkingmachines/inkling',
+  'nvidia/nemotron-3-nano-30b-a3b',
+  'nvidia/nemotron-4-340b-instruct',
+  'meta/llama-3-8b-instruct',
+  'meta/llama-3-70b-instruct',
+];
+
 const normalizeNVIDIAModelId = (provider, modelId) => {
-  if (String(provider).toLowerCase() === 'nvidia' && modelId === 'thinkingmachines/inkling') {
+  if (String(provider).toLowerCase() === 'nvidia' && (DEPRECATED_NVIDIA_MODELS.includes(modelId) || !modelId)) {
     return 'meta/llama-3.1-8b-instruct';
   }
   return modelId;
@@ -191,7 +199,33 @@ const getOrCreateConfig = async () => {
     + '+integrations.whatsapp.accessToken +integrations.whatsapp.verifyToken'
   );
   if (!config) {
-    config = await AIConfig.create({});
+    config = await AIConfig.create({
+      models: [{
+        name: 'Llama 3.1 8B Instruct',
+        provider: 'nvidia',
+        modelId: 'meta/llama-3.1-8b-instruct',
+        endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
+        isActive: true,
+        isDefault: true,
+        maxTokens: 4096,
+        temperature: 0.7,
+        capabilities: ['chat', 'completion'],
+      }]
+    });
+  } else {
+    // Auto-migrate any deprecated model IDs saved in database
+    let changed = false;
+    (config.models || []).forEach(m => {
+      if (m.provider?.toLowerCase() === 'nvidia' && DEPRECATED_NVIDIA_MODELS.includes(m.modelId)) {
+        console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' to 'meta/llama-3.1-8b-instruct'`);
+        m.modelId = 'meta/llama-3.1-8b-instruct';
+        m.name = m.name?.toLowerCase().includes('nemotron') || m.name?.toLowerCase().includes('inkling') ? 'Llama 3.1 8B Instruct' : m.name;
+        changed = true;
+      }
+    });
+    if (changed) {
+      await config.save();
+    }
   }
   return config;
 };
