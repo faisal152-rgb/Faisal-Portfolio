@@ -119,17 +119,19 @@ export default function APIManager() {
         return;
       }
       
-      const updateData = {
-        provider: formData.provider,
-        name: formData.name.trim(),
-        baseUrl: formData.baseUrl.trim(),
-        model: formData.model.trim(),
-        isActive: formData.isActive,
-      };
-
-      if (formData.key && formData.key.trim() !== '') {
+      const updateData = { ...formData };
+      if (formData.key.trim() === '') {
+        const existingKey = (apiKeys || []).find(k => k._id === editingId);
+        if (existingKey) {
+          updateData.key = existingKey.key;
+        }
+      } else {
         updateData.key = formData.key.trim();
       }
+      
+      updateData.name = formData.name.trim();
+      updateData.baseUrl = formData.baseUrl.trim();
+      updateData.model = formData.model.trim();
       
       const result = await dataService.updateAPIKey(editingId, updateData);
       const updatedKeys = Array.isArray(result) ? result : [result];
