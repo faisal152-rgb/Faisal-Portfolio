@@ -311,3 +311,4 @@ process.on('unhandledRejection', (err) => {
 });
 
 export { app, io };
+export default app;
