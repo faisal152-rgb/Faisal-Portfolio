@@ -75,6 +75,7 @@ const DEPRECATED_NVIDIA_MODELS = [
   'thinkingmachines/inkling',
   'nvidia/nemotron-3-nano-30b-a3b',
   'nvidia/nemotron-4-340b-instruct',
+  'nvidia/llama-3.1-nemotron-70b-instruct',
   'meta/llama-3-8b-instruct',
   'meta/llama-3-70b-instruct',
   'meta/llama-3.1-8b-instruct',
@@ -83,7 +84,7 @@ const DEPRECATED_NVIDIA_MODELS = [
 
 const normalizeNVIDIAModelId = (provider, modelId) => {
   if (String(provider).toLowerCase() === 'nvidia' && (DEPRECATED_NVIDIA_MODELS.includes(modelId) || !modelId)) {
-    return 'nvidia/llama-3.1-nemotron-70b-instruct';
+    return 'mistralai/mistral-7b-instruct-v0.3';
   }
   return modelId;
 };
@@ -203,9 +204,9 @@ const getOrCreateConfig = async () => {
   if (!config) {
     config = await AIConfig.create({
       models: [{
-        name: 'Llama 3.1 Nemotron 70B Instruct',
+        name: 'Mistral 7B Instruct v0.3',
         provider: 'nvidia',
-        modelId: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        modelId: 'mistralai/mistral-7b-instruct-v0.3',
         endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
         isActive: true,
         isDefault: true,
@@ -219,9 +220,9 @@ const getOrCreateConfig = async () => {
     let changed = false;
     (config.models || []).forEach(m => {
       if (m.provider?.toLowerCase() === 'nvidia' && DEPRECATED_NVIDIA_MODELS.includes(m.modelId)) {
-        console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' to 'nvidia/llama-3.1-nemotron-70b-instruct'`);
-        m.modelId = 'nvidia/llama-3.1-nemotron-70b-instruct';
-        m.name = 'Llama 3.1 Nemotron 70B Instruct';
+        console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' to 'mistralai/mistral-7b-instruct-v0.3'`);
+        m.modelId = 'mistralai/mistral-7b-instruct-v0.3';
+        m.name = 'Mistral 7B Instruct v0.3';
         changed = true;
       }
     });
@@ -1232,7 +1233,7 @@ async function callOpenAIApi(model, messages, apiKey = '') {
 }
 
 // ============ NVIDIA API CALL ============
-async function callNVIDIAApi(model, messages, apiKey = '') {
+async function callNVIDIAApi(model, messages, apiKey = '', isRetry = false) {
   if (!apiKey) {
     throw new Error('NVIDIA API key not configured');
   }
@@ -1259,6 +1260,14 @@ async function callNVIDIAApi(model, messages, apiKey = '') {
     const errorData = await response.json().catch(() => ({}));
     const detail = errorData.error?.message || errorData.detail || errorData.message || (typeof errorData === 'string' ? errorData : 'Unknown error');
     console.error(`[NVIDIA API Error] HTTP ${response.status}: ${detail}`);
+
+    // If model is missing/forbidden (404/410/400/403) and hasn't retried yet, auto-fallback to open model
+    if ((response.status === 404 || response.status === 410 || response.status === 400) && !isRetry) {
+      console.warn(`[NVIDIA API Fallback] Model '${storedModelId}' unavailable (${response.status}). Auto-retrying with 'mistralai/mistral-7b-instruct-v0.3'...`);
+      const fallbackModel = { ...model, modelId: 'mistralai/mistral-7b-instruct-v0.3' };
+      return await callNVIDIAApi(fallbackModel, messages, apiKey, true);
+    }
+
     throw new Error(`NVIDIA API error (${response.status}): ${detail}`);
   }
   
