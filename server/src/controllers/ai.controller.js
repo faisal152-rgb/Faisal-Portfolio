@@ -80,15 +80,28 @@ const DEPRECATED_NVIDIA_MODELS = [
   'meta/llama-3-70b-instruct',
   'meta/llama-3.1-8b-instruct',
   'meta/llama-3.1-70b-instruct',
+  'mistralai/mistral-7b-instruct-v0.3',  // EOL — UUID cd89bd68
+  'mistralai/mistral-7b-instruct-v0.2',
 ];
 
 // The only valid standard NVIDIA NIM completions endpoint
 const NVIDIA_STANDARD_ENDPOINT = 'https://integrate.api.nvidia.com/v1/chat/completions';
-// The stable fallback model available on all free NVIDIA developer accounts
-const NVIDIA_FALLBACK_MODEL = 'mistralai/mistral-7b-instruct-v0.3';
+
+// Ordered list of currently live free NVIDIA NIM models to try in sequence.
+// If the first model returns 404/410, the next one is tried automatically.
+const NVIDIA_FALLBACK_CHAIN = [
+  'meta/llama-3.3-70b-instruct',
+  'nvidia/llama-3.1-nemotron-nano-8b-v1',
+  'meta/llama-3.2-3b-instruct',
+  'google/gemma-3-27b-it',
+];
+
+// Primary fallback (first entry in chain)
+const NVIDIA_FALLBACK_MODEL = NVIDIA_FALLBACK_CHAIN[0];
 
 // Returns true if an endpoint URL contains a UUID-based NIM function path (stale)
-const isNvidiaUuidEndpoint = (url) => /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.test(String(url || ''));
+const isNvidiaUuidEndpoint = (url) =>
+  /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.test(String(url || ''));
 
 const normalizeNVIDIAModelId = (provider, modelId) => {
   if (String(provider).toLowerCase() === 'nvidia' && (DEPRECATED_NVIDIA_MODELS.includes(modelId) || !modelId)) {
@@ -1250,17 +1263,25 @@ async function callOpenAIApi(model, messages, apiKey = '') {
 }
 
 // ============ NVIDIA API CALL ============
-async function callNVIDIAApi(model, messages, apiKey = '', isRetry = false) {
+// Walks NVIDIA_FALLBACK_CHAIN sequentially on 404/410 until one model succeeds.
+async function callNVIDIAApi(model, messages, apiKey = '', chainIndex = 0) {
   if (!apiKey) {
     throw new Error('NVIDIA API key not configured');
   }
 
-  const storedModelId = isRetry ? NVIDIA_FALLBACK_MODEL : normalizeNVIDIAModelId(model.provider, model.modelId);
+  // chainIndex 0 = use the model from DB (after normalization);
+  // chainIndex > 0 = use the fallback chain entry at that position.
+  const isFallback = chainIndex > 0;
+  const storedModelId = isFallback
+    ? NVIDIA_FALLBACK_CHAIN[chainIndex - 1]
+    : normalizeNVIDIAModelId(model.provider, model.modelId);
 
-  // Always use the standard endpoint — reject any stale UUID-based NIM function endpoint from DB
-  const endpoint = (model.endpoint && !isNvidiaUuidEndpoint(model.endpoint))
+  // Always use the standard endpoint — never use a stale UUID-based NIM URL from DB
+  const endpoint = (!isFallback && model.endpoint && !isNvidiaUuidEndpoint(model.endpoint))
     ? model.endpoint
     : NVIDIA_STANDARD_ENDPOINT;
+
+  console.log(`[NVIDIA API] Calling model '${storedModelId}' (chain step ${chainIndex})`);
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -1279,16 +1300,22 @@ async function callNVIDIAApi(model, messages, apiKey = '', isRetry = false) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const detail = errorData.error?.message || errorData.detail || errorData.message || (typeof errorData === 'string' ? errorData : 'Unknown error');
+    const detail = errorData.error?.message || errorData.detail || errorData.message
+      || (typeof errorData === 'string' ? errorData : 'Unknown error');
     console.error(`[NVIDIA API Error] HTTP ${response.status} (model: ${storedModelId}): ${detail}`);
 
-    // On 404/410/400 auto-fallback once to the stable open model
-    if ((response.status === 404 || response.status === 410 || response.status === 400) && !isRetry) {
-      console.warn(`[NVIDIA API Fallback] '${storedModelId}' unavailable (${response.status}). Retrying with '${NVIDIA_FALLBACK_MODEL}'...`);
-      const fallbackModel = { ...model, modelId: NVIDIA_FALLBACK_MODEL, endpoint: NVIDIA_STANDARD_ENDPOINT };
-      return await callNVIDIAApi(fallbackModel, messages, apiKey, true);
+    // On 404/410/400 walk to the next entry in the fallback chain
+    const isRetryable = response.status === 404 || response.status === 410 || response.status === 400;
+    if (isRetryable && chainIndex < NVIDIA_FALLBACK_CHAIN.length) {
+      const nextModel = NVIDIA_FALLBACK_CHAIN[chainIndex];
+      console.warn(`[NVIDIA Fallback] '${storedModelId}' unavailable. Trying chain[${chainIndex}]: '${nextModel}'...`);
+      return await callNVIDIAApi(
+        { ...model, endpoint: NVIDIA_STANDARD_ENDPOINT },
+        messages, apiKey, chainIndex + 1
+      );
     }
 
+    // All fallbacks exhausted
     throw new Error(`NVIDIA API error (${response.status}): ${detail}`);
   }
 
