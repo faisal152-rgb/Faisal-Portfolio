@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Backend API for Faisal Portfolio with full security",
   "type": "module",
-  "main": "src/index.js",
+  "main": "npx nodemon index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "npx nodemon server.js",
+    "dev": "npx nodemon index.js",
     "test": "vitest"
   },
   "dependencies": {
