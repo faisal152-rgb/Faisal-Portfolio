@@ -82,9 +82,17 @@ const DEPRECATED_NVIDIA_MODELS = [
   'meta/llama-3.1-70b-instruct',
 ];
 
+// The only valid standard NVIDIA NIM completions endpoint
+const NVIDIA_STANDARD_ENDPOINT = 'https://integrate.api.nvidia.com/v1/chat/completions';
+// The stable fallback model available on all free NVIDIA developer accounts
+const NVIDIA_FALLBACK_MODEL = 'mistralai/mistral-7b-instruct-v0.3';
+
+// Returns true if an endpoint URL contains a UUID-based NIM function path (stale)
+const isNvidiaUuidEndpoint = (url) => /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.test(String(url || ''));
+
 const normalizeNVIDIAModelId = (provider, modelId) => {
   if (String(provider).toLowerCase() === 'nvidia' && (DEPRECATED_NVIDIA_MODELS.includes(modelId) || !modelId)) {
-    return 'mistralai/mistral-7b-instruct-v0.3';
+    return NVIDIA_FALLBACK_MODEL;
   }
   return modelId;
 };
@@ -216,14 +224,23 @@ const getOrCreateConfig = async () => {
       }]
     });
   } else {
-    // Auto-migrate any deprecated model IDs saved in database
+    // Auto-migrate deprecated model IDs and stale UUID-based endpoints saved in database
     let changed = false;
     (config.models || []).forEach(m => {
-      if (m.provider?.toLowerCase() === 'nvidia' && DEPRECATED_NVIDIA_MODELS.includes(m.modelId)) {
-        console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' to 'mistralai/mistral-7b-instruct-v0.3'`);
-        m.modelId = 'mistralai/mistral-7b-instruct-v0.3';
-        m.name = 'Mistral 7B Instruct v0.3';
-        changed = true;
+      if (m.provider?.toLowerCase() === 'nvidia') {
+        // Migrate deprecated model ID
+        if (DEPRECATED_NVIDIA_MODELS.includes(m.modelId)) {
+          console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' -> '${NVIDIA_FALLBACK_MODEL}'`);
+          m.modelId = NVIDIA_FALLBACK_MODEL;
+          m.name = 'Mistral 7B Instruct v0.3';
+          changed = true;
+        }
+        // Clear stale NIM UUID-based endpoint URLs
+        if (m.endpoint && isNvidiaUuidEndpoint(m.endpoint)) {
+          console.log(`[AI Model Migration] Clearing stale NIM endpoint '${m.endpoint}' -> standard endpoint`);
+          m.endpoint = NVIDIA_STANDARD_ENDPOINT;
+          changed = true;
+        }
       }
     });
     if (changed) {
@@ -1237,10 +1254,14 @@ async function callNVIDIAApi(model, messages, apiKey = '', isRetry = false) {
   if (!apiKey) {
     throw new Error('NVIDIA API key not configured');
   }
-  
-  const storedModelId = normalizeNVIDIAModelId(model.provider, model.modelId);
-  const endpoint = model.endpoint || 'https://integrate.api.nvidia.com/v1/chat/completions';
-  
+
+  const storedModelId = isRetry ? NVIDIA_FALLBACK_MODEL : normalizeNVIDIAModelId(model.provider, model.modelId);
+
+  // Always use the standard endpoint — reject any stale UUID-based NIM function endpoint from DB
+  const endpoint = (model.endpoint && !isNvidiaUuidEndpoint(model.endpoint))
+    ? model.endpoint
+    : NVIDIA_STANDARD_ENDPOINT;
+
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -1255,22 +1276,22 @@ async function callNVIDIAApi(model, messages, apiKey = '', isRetry = false) {
       stream: false
     })
   });
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     const detail = errorData.error?.message || errorData.detail || errorData.message || (typeof errorData === 'string' ? errorData : 'Unknown error');
-    console.error(`[NVIDIA API Error] HTTP ${response.status}: ${detail}`);
+    console.error(`[NVIDIA API Error] HTTP ${response.status} (model: ${storedModelId}): ${detail}`);
 
-    // If model is missing/forbidden (404/410/400/403) and hasn't retried yet, auto-fallback to open model
+    // On 404/410/400 auto-fallback once to the stable open model
     if ((response.status === 404 || response.status === 410 || response.status === 400) && !isRetry) {
-      console.warn(`[NVIDIA API Fallback] Model '${storedModelId}' unavailable (${response.status}). Auto-retrying with 'mistralai/mistral-7b-instruct-v0.3'...`);
-      const fallbackModel = { ...model, modelId: 'mistralai/mistral-7b-instruct-v0.3' };
+      console.warn(`[NVIDIA API Fallback] '${storedModelId}' unavailable (${response.status}). Retrying with '${NVIDIA_FALLBACK_MODEL}'...`);
+      const fallbackModel = { ...model, modelId: NVIDIA_FALLBACK_MODEL, endpoint: NVIDIA_STANDARD_ENDPOINT };
       return await callNVIDIAApi(fallbackModel, messages, apiKey, true);
     }
 
     throw new Error(`NVIDIA API error (${response.status}): ${detail}`);
   }
-  
+
   const data = await response.json();
   return data.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
 }
