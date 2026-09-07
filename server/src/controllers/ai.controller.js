@@ -77,11 +77,13 @@ const DEPRECATED_NVIDIA_MODELS = [
   'nvidia/nemotron-4-340b-instruct',
   'meta/llama-3-8b-instruct',
   'meta/llama-3-70b-instruct',
+  'meta/llama-3.1-8b-instruct',
+  'meta/llama-3.1-70b-instruct',
 ];
 
 const normalizeNVIDIAModelId = (provider, modelId) => {
   if (String(provider).toLowerCase() === 'nvidia' && (DEPRECATED_NVIDIA_MODELS.includes(modelId) || !modelId)) {
-    return 'meta/llama-3.1-8b-instruct';
+    return 'nvidia/llama-3.1-nemotron-70b-instruct';
   }
   return modelId;
 };
@@ -201,9 +203,9 @@ const getOrCreateConfig = async () => {
   if (!config) {
     config = await AIConfig.create({
       models: [{
-        name: 'Llama 3.1 8B Instruct',
+        name: 'Llama 3.1 Nemotron 70B Instruct',
         provider: 'nvidia',
-        modelId: 'meta/llama-3.1-8b-instruct',
+        modelId: 'nvidia/llama-3.1-nemotron-70b-instruct',
         endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
         isActive: true,
         isDefault: true,
@@ -217,9 +219,9 @@ const getOrCreateConfig = async () => {
     let changed = false;
     (config.models || []).forEach(m => {
       if (m.provider?.toLowerCase() === 'nvidia' && DEPRECATED_NVIDIA_MODELS.includes(m.modelId)) {
-        console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' to 'meta/llama-3.1-8b-instruct'`);
-        m.modelId = 'meta/llama-3.1-8b-instruct';
-        m.name = m.name?.toLowerCase().includes('nemotron') || m.name?.toLowerCase().includes('inkling') ? 'Llama 3.1 8B Instruct' : m.name;
+        console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' to 'nvidia/llama-3.1-nemotron-70b-instruct'`);
+        m.modelId = 'nvidia/llama-3.1-nemotron-70b-instruct';
+        m.name = 'Llama 3.1 Nemotron 70B Instruct';
         changed = true;
       }
     });
