@@ -1,4 +1,4 @@
-import { createHash, createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -17,52 +17,6 @@ const uploadsDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url
 
 const sanitizeAIResponse = (value) => String(value || '').replace(/\*\*/g, '');
 
-// ── Security & AES-256-GCM Encryption Helpers for API Keys at Rest ──────────
-const getEncryptionSecretKey = () => {
-  const secret = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || 'faisal-portfolio-fallback-encryption-secret-32-chars';
-  return createHash('sha256').update(secret).digest();
-};
-
-const encryptApiKey = (text) => {
-  if (!text || typeof text !== 'string') return text;
-  const trimmed = text.trim();
-  if (!trimmed || trimmed.startsWith('enc:v1:')) return trimmed; // Already encrypted or empty
-
-  try {
-    const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', getEncryptionSecretKey(), iv);
-    let encrypted = cipher.update(trimmed, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag().toString('hex');
-    return `enc:v1:${iv.toString('hex')}:${authTag}:${encrypted}`;
-  } catch (error) {
-    console.error('[Encryption] Failed to encrypt API key:', error.message);
-    return trimmed;
-  }
-};
-
-const decryptApiKey = (encryptedText) => {
-  if (!encryptedText || typeof encryptedText !== 'string') return encryptedText;
-  const trimmed = encryptedText.trim();
-  if (!trimmed.startsWith('enc:v1:')) return trimmed; // Plaintext legacy key fallback
-
-  try {
-    const parts = trimmed.split(':');
-    if (parts.length !== 5) return trimmed;
-    const [, , ivHex, authTagHex, encryptedHex] = parts;
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const decipher = createDecipheriv('aes-256-gcm', getEncryptionSecretKey(), iv);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (error) {
-    console.error('[Decryption] Failed to decrypt API key:', error.message);
-    return trimmed;
-  }
-};
-
 const buildLanguageInstruction = (language) => {
   const selectedLanguage = String(language || 'Auto Detect').trim();
   if (!selectedLanguage || selectedLanguage.toLowerCase() === 'auto detect') {
@@ -71,41 +25,9 @@ const buildLanguageInstruction = (language) => {
   return `LANGUAGE: Reply only in ${selectedLanguage}. Do not switch languages unless the client explicitly requests it.`;
 };
 
-const DEPRECATED_NVIDIA_MODELS = [
-  'thinkingmachines/inkling',
-  'nvidia/nemotron-3-nano-30b-a3b',
-  'nvidia/nemotron-4-340b-instruct',
-  'nvidia/llama-3.1-nemotron-70b-instruct',
-  'meta/llama-3-8b-instruct',
-  'meta/llama-3-70b-instruct',
-  'meta/llama-3.1-8b-instruct',
-  'meta/llama-3.1-70b-instruct',
-  'mistralai/mistral-7b-instruct-v0.3',  // EOL — UUID cd89bd68
-  'mistralai/mistral-7b-instruct-v0.2',
-];
-
-// The only valid standard NVIDIA NIM completions endpoint
-const NVIDIA_STANDARD_ENDPOINT = 'https://integrate.api.nvidia.com/v1/chat/completions';
-
-// Ordered list of currently live free NVIDIA NIM models to try in sequence.
-// If the first model returns 404/410, the next one is tried automatically.
-const NVIDIA_FALLBACK_CHAIN = [
-  'meta/llama-3.3-70b-instruct',
-  'nvidia/llama-3.1-nemotron-nano-8b-v1',
-  'meta/llama-3.2-3b-instruct',
-  'google/gemma-3-27b-it',
-];
-
-// Primary fallback (first entry in chain)
-const NVIDIA_FALLBACK_MODEL = NVIDIA_FALLBACK_CHAIN[0];
-
-// Returns true if an endpoint URL contains a UUID-based NIM function path (stale)
-const isNvidiaUuidEndpoint = (url) =>
-  /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.test(String(url || ''));
-
 const normalizeNVIDIAModelId = (provider, modelId) => {
-  if (String(provider).toLowerCase() === 'nvidia' && (DEPRECATED_NVIDIA_MODELS.includes(modelId) || !modelId)) {
-    return NVIDIA_FALLBACK_MODEL;
+  if (String(provider).toLowerCase() === 'nvidia' && modelId === 'thinkingmachines/inkling') {
+    return 'meta/llama-3.1-8b-instruct';
   }
   return modelId;
 };
@@ -223,42 +145,7 @@ const getOrCreateConfig = async () => {
     + '+integrations.whatsapp.accessToken +integrations.whatsapp.verifyToken'
   );
   if (!config) {
-    config = await AIConfig.create({
-      models: [{
-        name: 'Mistral 7B Instruct v0.3',
-        provider: 'nvidia',
-        modelId: 'mistralai/mistral-7b-instruct-v0.3',
-        endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
-        isActive: true,
-        isDefault: true,
-        maxTokens: 4096,
-        temperature: 0.7,
-        capabilities: ['chat', 'completion'],
-      }]
-    });
-  } else {
-    // Auto-migrate deprecated model IDs and stale UUID-based endpoints saved in database
-    let changed = false;
-    (config.models || []).forEach(m => {
-      if (m.provider?.toLowerCase() === 'nvidia') {
-        // Migrate deprecated model ID
-        if (DEPRECATED_NVIDIA_MODELS.includes(m.modelId)) {
-          console.log(`[AI Model Migration] Migrating deprecated model '${m.modelId}' -> '${NVIDIA_FALLBACK_MODEL}'`);
-          m.modelId = NVIDIA_FALLBACK_MODEL;
-          m.name = 'Mistral 7B Instruct v0.3';
-          changed = true;
-        }
-        // Clear stale NIM UUID-based endpoint URLs
-        if (m.endpoint && isNvidiaUuidEndpoint(m.endpoint)) {
-          console.log(`[AI Model Migration] Clearing stale NIM endpoint '${m.endpoint}' -> standard endpoint`);
-          m.endpoint = NVIDIA_STANDARD_ENDPOINT;
-          changed = true;
-        }
-      }
-    });
-    if (changed) {
-      await config.save();
-    }
+    config = await AIConfig.create({});
   }
   return config;
 };
@@ -513,14 +400,15 @@ export const chatWithAI = asyncHandler(async (req, res) => {
     });
   }
   
-  // Get API key using robust 3-tier lookup (database apiKeys -> model.apiKey -> env)
-  const keyInfo = getApiKeyForProvider(config, selectedModel?.provider, selectedModel);
-  const modelApiKey = keyInfo.key;
-  if (keyInfo.key) {
-    const maskedKey = keyInfo.key.length > 8 ? `${keyInfo.key.slice(0, 6)}...${keyInfo.key.slice(-4)}` : '***';
-    console.log(`[AI Chat] Resolved API key for '${selectedModel?.provider}' from ${keyInfo.source}: ${maskedKey}`);
-  } else {
-    console.warn(`[AI Chat] WARNING: No API key found for provider '${selectedModel?.provider}' in database or environment variables.`);
+  // Get API key from centralized apiKeys array (not from model)
+  let modelApiKey = '';
+  const apiKeysArray = Array.isArray(config.apiKeys) ? config.apiKeys : [];
+  
+  const apiKeyRecord = apiKeysArray.find(ak => 
+    ak?.provider?.toLowerCase() === selectedModel?.provider?.toLowerCase() && ak?.isActive
+  );
+  if (apiKeyRecord) {
+    modelApiKey = apiKeyRecord.key;
   }
 
   // Get persona by active working time, falling back to default/first active persona
@@ -861,13 +749,7 @@ export const runAssistantWorkflow = asyncHandler(async (req, res) => {
 
   const selectedModel = config.models.find(model => model.isDefault && model.isActive) || config.models.find(model => model.isActive);
   if (!selectedModel) return res.status(503).json({ success: false, message: 'No active AI model available' });
-  const keyInfo = getApiKeyForProvider(config, selectedModel.provider, selectedModel);
-  if (keyInfo.key) {
-    const maskedKey = keyInfo.key.length > 8 ? `${keyInfo.key.slice(0, 6)}...${keyInfo.key.slice(-4)}` : '***';
-    console.log(`[AI Workflow] Resolved API key for '${selectedModel.provider}' from ${keyInfo.source}: ${maskedKey}`);
-  } else {
-    console.warn(`[AI Workflow] WARNING: No API key found for provider '${selectedModel.provider}' in database or environment variables.`);
-  }
+  const apiKeyRecord = (config.apiKeys || []).find(key => key.isActive && key.provider?.toLowerCase() === selectedModel.provider?.toLowerCase());
   const persona = getActivePersona(config);
   const currentSessionId = sessionId || randomBytes(16).toString('hex');
   const sentAt = new Date();
@@ -938,7 +820,7 @@ export const runAssistantWorkflow = asyncHandler(async (req, res) => {
     status: rescheduleMeetingDoc.status,
   } : null;
 
-  const aiResponse = await callAIApi(selectedModel, persona, message, keyInfo.key || '', config.personas || [], [
+  const aiResponse = await callAIApi(selectedModel, persona, message, apiKeyRecord?.key || '', config.personas || [], [
     { role: 'system', content: workflowSystemPrompt(config, persona, { hasConversation: history.length > 0, explicitIdentity, lead: existingLead, meeting: existingMeeting, rescheduleMode, existingMeetingInfo }) },
     ...history,
     { role: 'user', content: message },
@@ -1159,41 +1041,6 @@ function buildPersonaSystemPrompt(persona, allPersonas = []) {
   return `${basePrompt}\n\n${personaGuidance.join(' ')}`;
 }
 
-const getApiKeyForProvider = (config, provider, model = null) => {
-  const normProvider = String(provider || '').toLowerCase();
-  
-  // 1. Check centralized apiKeys array in config
-  const apiKeysArray = Array.isArray(config?.apiKeys) ? config.apiKeys : [];
-  const apiKeyRecord = apiKeysArray.find(ak => 
-    ak?.isActive && ak?.provider?.toLowerCase() === normProvider && ak?.key && String(ak.key).trim() !== ''
-  );
-  if (apiKeyRecord?.key && String(apiKeyRecord.key).trim() !== '') {
-    const rawKey = decryptApiKey(String(apiKeyRecord.key).trim());
-    return { key: rawKey, source: 'database (apiKeys)' };
-  }
-
-  // 2. Check model-level apiKey if attached
-  if (model?.apiKey && String(model.apiKey).trim() !== '') {
-    const rawKey = decryptApiKey(String(model.apiKey).trim());
-    return { key: rawKey, source: 'database (model.apiKey)' };
-  }
-
-  // 3. Fallback to process.env environment variables
-  const envMap = {
-    nvidia: process.env.NVIDIA_API_KEY || process.env.AI_API_KEY,
-    openai: process.env.OPENAI_API_KEY || process.env.AI_API_KEY,
-    anthropic: process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY,
-    google: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.AI_API_KEY,
-  };
-
-  const envKey = envMap[normProvider] || process.env.AI_API_KEY || '';
-  if (envKey && String(envKey).trim() !== '') {
-    return { key: String(envKey).trim(), source: 'environment variable' };
-  }
-
-  return { key: '', source: 'none' };
-};
-
 async function callAIApi(model, persona, message, apiKey = '', allPersonas = [], contextMessages = []) {
   // Prepare system prompt from persona
   const systemPrompt = buildPersonaSystemPrompt(persona, allPersonas);
@@ -1233,7 +1080,6 @@ async function callOpenAIApi(model, messages, apiKey = '') {
     throw new Error('OpenAI API key not configured');
   }
   
-  const storedModelId = normalizeNVIDIAModelId(model.provider, model.modelId);
   const endpoint = model.endpoint || 'https://api.openai.com/v1/chat/completions';
   
   const response = await fetch(endpoint, {
@@ -1243,7 +1089,7 @@ async function callOpenAIApi(model, messages, apiKey = '') {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: storedModelId,
+      model: model.modelId,
       messages: messages,
       temperature: model.temperature || 0.7,
       max_tokens: model.maxTokens || 4096,
@@ -1252,10 +1098,8 @@ async function callOpenAIApi(model, messages, apiKey = '') {
   });
   
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const detail = errorData.error?.message || errorData.detail || errorData.message || (typeof errorData === 'string' ? errorData : 'Unknown error');
-    console.error(`[OpenAI API Error] HTTP ${response.status}: ${detail}`);
-    throw new Error(`OpenAI API error (${response.status}): ${detail}`);
+    const errorData = await response.json();
+    throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
   
   const data = await response.json();
@@ -1263,26 +1107,13 @@ async function callOpenAIApi(model, messages, apiKey = '') {
 }
 
 // ============ NVIDIA API CALL ============
-// Walks NVIDIA_FALLBACK_CHAIN sequentially on 404/410 until one model succeeds.
-async function callNVIDIAApi(model, messages, apiKey = '', chainIndex = 0) {
+async function callNVIDIAApi(model, messages, apiKey = '') {
   if (!apiKey) {
     throw new Error('NVIDIA API key not configured');
   }
-
-  // chainIndex 0 = use the model from DB (after normalization);
-  // chainIndex > 0 = use the fallback chain entry at that position.
-  const isFallback = chainIndex > 0;
-  const storedModelId = isFallback
-    ? NVIDIA_FALLBACK_CHAIN[chainIndex - 1]
-    : normalizeNVIDIAModelId(model.provider, model.modelId);
-
-  // Always use the standard endpoint — never use a stale UUID-based NIM URL from DB
-  const endpoint = (!isFallback && model.endpoint && !isNvidiaUuidEndpoint(model.endpoint))
-    ? model.endpoint
-    : NVIDIA_STANDARD_ENDPOINT;
-
-  console.log(`[NVIDIA API] Calling model '${storedModelId}' (chain step ${chainIndex})`);
-
+  
+  const endpoint = model.endpoint || 'https://integrate.api.nvidia.com/v1/chat/completions';
+  
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -1290,35 +1121,19 @@ async function callNVIDIAApi(model, messages, apiKey = '', chainIndex = 0) {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: storedModelId,
+      model: model.modelId,
       messages: messages,
       temperature: model.temperature || 0.7,
       max_tokens: model.maxTokens || 4096,
       stream: false
     })
   });
-
+  
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const detail = errorData.error?.message || errorData.detail || errorData.message
-      || (typeof errorData === 'string' ? errorData : 'Unknown error');
-    console.error(`[NVIDIA API Error] HTTP ${response.status} (model: ${storedModelId}): ${detail}`);
-
-    // On 404/410/400 walk to the next entry in the fallback chain
-    const isRetryable = response.status === 404 || response.status === 410 || response.status === 400;
-    if (isRetryable && chainIndex < NVIDIA_FALLBACK_CHAIN.length) {
-      const nextModel = NVIDIA_FALLBACK_CHAIN[chainIndex];
-      console.warn(`[NVIDIA Fallback] '${storedModelId}' unavailable. Trying chain[${chainIndex}]: '${nextModel}'...`);
-      return await callNVIDIAApi(
-        { ...model, endpoint: NVIDIA_STANDARD_ENDPOINT },
-        messages, apiKey, chainIndex + 1
-      );
-    }
-
-    // All fallbacks exhausted
-    throw new Error(`NVIDIA API error (${response.status}): ${detail}`);
+    const errorData = await response.json();
+    throw new Error(`NVIDIA API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
-
+  
   const data = await response.json();
   return data.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
 }
@@ -1355,10 +1170,8 @@ async function callAnthropicApi(model, messages, apiKey = '') {
   });
   
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const detail = errorData.error?.message || errorData.detail || errorData.message || (typeof errorData === 'string' ? errorData : 'Unknown error');
-    console.error(`[Anthropic API Error] HTTP ${response.status}: ${detail}`);
-    throw new Error(`Anthropic API error (${response.status}): ${detail}`);
+    const errorData = await response.json();
+    throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
   
   const data = await response.json();
@@ -1405,10 +1218,8 @@ async function callGoogleApi(model, messages, apiKey = '') {
   });
   
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const detail = errorData.error?.message || errorData.detail || errorData.message || (typeof errorData === 'string' ? errorData : 'Unknown error');
-    console.error(`[Google API Error] HTTP ${response.status}: ${detail}`);
-    throw new Error(`Google API error (${response.status}): ${detail}`);
+    const errorData = await response.json();
+    throw new Error(`Google API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
   
   const data = await response.json();
@@ -1439,10 +1250,8 @@ async function callOpenAICompatibleApi(model, messages, apiKey = '') {
   });
   
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const detail = errorData.error?.message || errorData.detail || errorData.message || (typeof errorData === 'string' ? errorData : 'Unknown error');
-    console.error(`[AI API Error] HTTP ${response.status}: ${detail}`);
-    throw new Error(`API error (${response.status}): ${detail}`);
+    const errorData = await response.json();
+    throw new Error(`API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
   
   const data = await response.json();
@@ -1515,9 +1324,9 @@ export const createAIModel = asyncHandler(async (req, res) => {
     capabilities: Array.isArray(req.body.capabilities) ? req.body.capabilities : [],
   };
   
-  // Add API key only if provided (encrypt before storing)
+  // Add API key only if provided
   if (req.body.apiKey && typeof req.body.apiKey === 'string') {
-    modelData.apiKey = encryptApiKey(String(req.body.apiKey).trim());
+    modelData.apiKey = String(req.body.apiKey).trim();
   }
   
   // If this is set as default, unset others
@@ -1600,9 +1409,9 @@ export const updateAIModel = asyncHandler(async (req, res) => {
     config.models[modelIndex].capabilities = req.body.capabilities;
   }
   
-  // Handle API key update - encrypt before storing
+  // Handle API key update - only update if provided and not empty
   if (req.body.apiKey !== undefined && req.body.apiKey !== '') {
-    config.models[modelIndex].apiKey = encryptApiKey(String(req.body.apiKey).trim());
+    config.models[modelIndex].apiKey = String(req.body.apiKey).trim();
   }
   
   // Handle default status
@@ -1830,12 +1639,10 @@ export const getAPIKeys = asyncHandler(async (req, res) => {
 export const getAPIKeysWithValues = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
   
-  // Return keys with decrypted values for authenticated users
+  // Return keys with values for authenticated users
   const keys = config.apiKeys.map(k => {
     const key = k.toObject();
-    if (key.key) {
-      key.key = decryptApiKey(key.key);
-    }
+    // Keep the key value for the authenticated user
     return key;
   });
   
@@ -1844,11 +1651,7 @@ export const getAPIKeysWithValues = asyncHandler(async (req, res) => {
 
 export const createAPIKey = asyncHandler(async (req, res) => {
   const config = await getOrCreateConfig();
-  const keyData = { ...req.body };
-  if (keyData.key) {
-    keyData.key = encryptApiKey(String(keyData.key).trim());
-  }
-  config.apiKeys.push(keyData);
+  config.apiKeys.push(req.body);
   config.updatedBy = req.user.id;
   await config.save();
   
@@ -1867,14 +1670,6 @@ export const updateAPIKey = asyncHandler(async (req, res) => {
   
   Object.keys(req.body).forEach(key => {
     if (key !== '_id') {
-      // Preserve existing key string if req.body.key is empty or undefined
-      if (key === 'key') {
-        if (!req.body.key || String(req.body.key).trim() === '') {
-          return;
-        }
-        config.apiKeys[index][key] = encryptApiKey(String(req.body.key).trim());
-        return;
-      }
       config.apiKeys[index][key] = req.body[key];
     }
   });
